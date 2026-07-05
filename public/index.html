@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ورشة أبو أحمد للدراجات الهوائية - نظام إدارة المبيعات</title>
+    <title>ورشة أبو أحمد - نظام إدارة المبيعات</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- SortableJS للسحب والإفلات -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <style>
-        /* ... نفس الـ CSS السابق ... */
+        /* --- جميع الـ styles السابقة مع بعض الإضافات --- */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Tajawal', sans-serif; background: linear-gradient(135deg, #FFF5DF 0%, #F5E6D3 100%); min-height: 100vh; direction: rtl; }
         .header { background: linear-gradient(135deg, #121B38 0%, #1a2854 100%); color: white; padding: 20px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
@@ -33,6 +35,7 @@
         .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(197, 99, 44, 0.3); }
         .btn-danger { background: linear-gradient(135deg, #dc3545 0%, #e35563 100%); }
         .btn-success { background: linear-gradient(135deg, #28a745 0%, #34ce57 100%); }
+        .btn-warning { background: linear-gradient(135deg, #ffc107 0%, #ffca2c 100%); color: #121B38; }
         .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
         .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; }
         .product-btn { background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 2px solid #dee2e6; border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.3s ease; text-align: center; }
@@ -49,30 +52,141 @@
         .sale-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 8px; background: white; border-radius: 6px; border-right: 4px solid #C5632C; }
         .sale-item .sale-info { flex: 1; }
         .sale-item .sale-actions { display: flex; gap: 8px; align-items: center; }
-        .alert { padding: 15px; border-radius: 8px; margin-bottom: 20px; border-right: 4px solid; }
-        .alert-success { background: #d4edda; color: #155724; border-color: #28a745; }
-        .alert-info { background: #d1ecf1; color: #0c5460; border-color: #17a2b8; }
         .search-box { position: relative; margin-bottom: 20px; }
         .search-box input { padding-right: 45px; }
         .search-box i { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: #C5632C; }
-        .product-list { max-height: 500px; overflow-y: auto; }
-        .product-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; margin-bottom: 10px; background: #f8f9fa; border-radius: 8px; border: 2px solid #e9ecef; }
-        .product-info h4 { color: #121B38; margin-bottom: 5px; }
-        .product-info p { color: #6c757d; margin: 2px 0; }
+        
+        /* --- قائمة المنتجات الجديدة مع السحب --- */
+        .product-list {
+            max-height: 500px;
+            overflow-y: auto;
+            min-height: 100px;
+        }
+        .product-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            transition: all 0.2s ease;
+            cursor: default;
+        }
+        .product-item:hover {
+            border-color: #C5632C;
+            box-shadow: 0 2px 10px rgba(197, 99, 44, 0.1);
+        }
+        .product-item .drag-handle {
+            cursor: grab;
+            color: #adb5bd;
+            padding: 0 10px 0 5px;
+            font-size: 1.2rem;
+            user-select: none;
+            transition: color 0.2s;
+        }
+        .product-item .drag-handle:hover {
+            color: #121B38;
+        }
+        .product-item .drag-handle:active {
+            cursor: grabbing;
+        }
+        .product-item .product-info {
+            flex: 1;
+        }
+        .product-item .product-info h4 { color: #121B38; margin-bottom: 5px; }
+        .product-item .product-info p { color: #6c757d; margin: 2px 0; }
+        .product-item .product-actions {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        /* أنيميشن السحب والإفلات */
+        .sortable-ghost {
+            opacity: 0.4;
+            border-style: dashed;
+            background: #e9ecef;
+        }
+        .sortable-chosen {
+            border-color: #C5632C !important;
+            box-shadow: 0 4px 20px rgba(197, 99, 44, 0.3);
+        }
+
         .reports-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
         .report-card { background: #f8f9fa; padding: 20px; border-radius: 12px; border: 2px solid #e9ecef; }
         .date-filter { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
-        @media (max-width: 768px) { .tabs { flex-direction: column; } .header h1 { font-size: 2rem; } .container { padding: 10px; } .products-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } .summary-grid { grid-template-columns: 1fr; } .date-filter { flex-direction: column; align-items: stretch; } }
-        .loading { text-align: center; padding: 20px; color: #6c757d; }
         .empty-state { text-align: center; padding: 40px; color: #6c757d; }
         .empty-state i { font-size: 3rem; margin-bottom: 15px; opacity: 0.5; }
-        .notification { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 15px 25px; border-radius: 8px; color: white; font-weight: 500; z-index: 1000; animation: slideDown 0.3s ease; }
+        
+        /* --- نافذة التعديل (Modal) --- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-box {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(50px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .modal-box h2 {
+            margin-bottom: 20px;
+            color: #121B38;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .modal-box .form-group {
+            margin-bottom: 15px;
+        }
+        .modal-box .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal-box .form-actions .btn {
+            flex: 1;
+        }
+        .modal-box .btn-close-modal {
+            background: #6c757d;
+        }
+
+        @media (max-width: 768px) {
+            .tabs { flex-direction: column; }
+            .header h1 { font-size: 2rem; }
+            .container { padding: 10px; }
+            .products-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+            .summary-grid { grid-template-columns: 1fr; }
+            .date-filter { flex-direction: column; align-items: stretch; }
+            .product-item { flex-wrap: wrap; gap: 10px; }
+        }
+        .notification { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 15px 25px; border-radius: 8px; color: white; font-weight: 500; z-index: 3000; animation: slideDown 0.3s ease; }
         .notification.success { background: #28a745; }
         .notification.error { background: #dc3545; }
+        .notification.info { background: #17a2b8; }
         @keyframes slideDown { from { transform: translateX(-50%) translateY(-100%); } to { transform: translateX(-50%) translateY(0); } }
     </style>
 </head>
 <body>
+    <!-- الهيدر والتبويبات كما هي -->
     <div class="header">
         <h1><i class="fas fa-bicycle"></i> ورشة أبو أحمد للدراجات الهوائية</h1>
         <p>نظام إدارة المبيعات المتطور</p>
@@ -85,7 +199,7 @@
             <button class="tab" data-tab="reports"><i class="fas fa-chart-bar"></i> التقارير المالية</button>
         </div>
 
-        <!-- نقاط البيع -->
+        <!-- نقاط البيع (نفس السابق) -->
         <div class="tab-content active" id="sales">
             <h2 class="section-title"><i class="fas fa-shopping-cart"></i> نقاط البيع</h2>
             <div class="sales-summary">
@@ -100,7 +214,7 @@
             <div class="grid">
                 <div class="card">
                     <h3 style="margin-bottom: 20px; color: #121B38;"><i class="fas fa-bicycle"></i> المنتجات المتاحة</h3>
-                    <div class="products-grid" id="salesProducts"><div class="empty-state"><i class="fas fa-bicycle"></i><p>لا توجد منتجات متاحة</p><p>يرجى إضافة منتجات من قسم إدارة المنتجات</p></div></div>
+                    <div class="products-grid" id="salesProducts"><div class="empty-state"><i class="fas fa-bicycle"></i><p>لا توجد منتجات متاحة</p></div></div>
                 </div>
                 <div class="card">
                     <h3 style="margin-bottom: 20px; color: #121B38;"><i class="fas fa-list"></i> سجل المبيعات اليومية</h3>
@@ -110,7 +224,7 @@
             </div>
         </div>
 
-        <!-- إدارة المنتجات -->
+        <!-- إدارة المنتجات (مع التعديلات الجديدة) -->
         <div class="tab-content" id="products">
             <h2 class="section-title"><i class="fas fa-bicycle"></i> إدارة المنتجات</h2>
             <div class="grid">
@@ -124,14 +238,16 @@
                     </form>
                 </div>
                 <div class="card">
-                    <h3 style="margin-bottom: 20px; color: #121B38;"><i class="fas fa-search"></i> قائمة المنتجات</h3>
+                    <h3 style="margin-bottom: 20px; color: #121B38;"><i class="fas fa-search"></i> قائمة المنتجات <span style="font-size:0.8rem; color:#6c757d; font-weight:400;">(اسحب الثلاث خطوط لإعادة الترتيب)</span></h3>
                     <div class="search-box"><input type="text" id="searchProducts" placeholder="البحث عن منتج..."><i class="fas fa-search"></i></div>
-                    <div class="product-list" id="productsList"><div class="empty-state"><i class="fas fa-bicycle"></i><p>لا توجد منتجات</p></div></div>
+                    <div class="product-list" id="productsList">
+                        <div class="empty-state"><i class="fas fa-bicycle"></i><p>لا توجد منتجات</p></div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- التقارير المالية -->
+        <!-- التقارير (نفس السابق) -->
         <div class="tab-content" id="reports">
             <h2 class="section-title"><i class="fas fa-chart-bar"></i> التقارير المالية</h2>
             <div class="date-filter">
@@ -168,11 +284,36 @@
         </div>
     </div>
 
+    <!-- نافذة تعديل المنتج (Modal) -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal-box">
+            <h2><i class="fas fa-edit" style="color: #C5632C;"></i> تعديل المنتج</h2>
+            <form id="editForm">
+                <input type="hidden" id="editProductId">
+                <div class="form-group">
+                    <label for="editProductName">اسم المنتج</label>
+                    <input type="text" id="editProductName" required>
+                </div>
+                <div class="form-group">
+                    <label for="editSalePrice">سعر البيع (د.ع)</label>
+                    <input type="number" id="editSalePrice" required min="0" step="1">
+                </div>
+                <div class="form-group">
+                    <label for="editCostPrice">التكلفة (د.ع)</label>
+                    <input type="number" id="editCostPrice" required min="0" step="1">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-close-modal" onclick="closeEditModal()"><i class="fas fa-times"></i> إلغاء</button>
+                    <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> حفظ التعديلات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 <script>
-    // متغيرات عامة
+    // ------------------- JavaScript (مع الميزات الجديدة) -------------------
     let products = [];
 
-    // دوال مساعدة
     function formatNumber(num) {
         return new Intl.NumberFormat('ar-IQ').format(num);
     }
@@ -192,10 +333,13 @@
                 ...options,
                 headers: { 'Content-Type': 'application/json', ...options.headers }
             });
-            if (!res.ok) throw new Error(await res.text());
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText || 'حدث خطأ');
+            }
             return await res.json();
         } catch (err) {
-            showNotification('خطأ في الاتصال بالسيرفر: ' + err.message, 'error');
+            showNotification('خطأ: ' + err.message, 'error');
             throw err;
         }
     }
@@ -208,9 +352,7 @@
             displaySalesProducts();
             updateTodayStats();
             updateGeneralStats();
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
     }
 
     // إضافة منتج
@@ -219,26 +361,16 @@
         const salePrice = parseInt(document.getElementById('salePrice').value);
         const costPrice = parseInt(document.getElementById('costPrice').value);
 
-        if (!name || !salePrice || !costPrice) {
-            showNotification('يرجى ملء جميع الحقول', 'error');
-            return;
-        }
-        if (salePrice <= costPrice) {
-            showNotification('سعر البيع يجب أن يكون أكبر من التكلفة', 'error');
-            return;
-        }
+        if (!name || !salePrice || !costPrice) { showNotification('يرجى ملء جميع الحقول', 'error'); return; }
+        if (salePrice <= costPrice) { showNotification('سعر البيع يجب أن يكون أكبر من التكلفة', 'error'); return; }
 
         try {
-            await apiFetch('/api/products', {
-                method: 'POST',
-                body: JSON.stringify({ name, salePrice, costPrice })
-            });
+            await apiFetch('/api/products', { method: 'POST', body: JSON.stringify({ name, salePrice, costPrice }) });
             document.getElementById('productForm').reset();
             showNotification('تم إضافة المنتج بنجاح');
-            loadData();
-        } catch (e) {
-            console.error(e);
-        }
+            await loadData();
+            initSortable(); // إعادة تهيئة السحب بعد تحديث القائمة
+        } catch (e) { console.error(e); }
     }
 
     // حذف منتج
@@ -247,85 +379,97 @@
         try {
             await apiFetch(`/api/products/${id}`, { method: 'DELETE' });
             showNotification('تم حذف المنتج');
-            loadData();
-        } catch (e) {
-            console.error(e);
-        }
+            await loadData();
+            initSortable();
+        } catch (e) { console.error(e); }
     }
 
-    // بيع منتج (النسخة المعدلة)
-    async function sellProduct(id) {
+    // ------------------- تعديل المنتج (جديد) -------------------
+    function openEditModal(id) {
         const product = products.find(p => p.id === id);
         if (!product) return;
+        document.getElementById('editProductId').value = product.id;
+        document.getElementById('editProductName').value = product.name;
+        document.getElementById('editSalePrice').value = product.sale_price;
+        document.getElementById('editCostPrice').value = product.cost_price;
+        document.getElementById('editModal').classList.add('active');
+    }
 
-        const now = new Date();
-        const date = now.toISOString().split('T')[0];
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
-        const time = `${hours}:${minutes}:${seconds}`;
+    function closeEditModal() {
+        document.getElementById('editModal').classList.remove('active');
+    }
 
-        const sale = {
-            productId: product.id,
-            productName: product.name,
-            salePrice: product.sale_price,
-            costPrice: product.cost_price,
-            profit: product.sale_price - product.cost_price,
-            date: date,
-            time: time
-        };
+    async function updateProduct(e) {
+        e.preventDefault();
+        const id = parseInt(document.getElementById('editProductId').value);
+        const name = document.getElementById('editProductName').value.trim();
+        const salePrice = parseInt(document.getElementById('editSalePrice').value);
+        const costPrice = parseInt(document.getElementById('editCostPrice').value);
+
+        if (!name || !salePrice || !costPrice) { showNotification('يرجى ملء جميع الحقول', 'error'); return; }
+        if (salePrice <= costPrice) { showNotification('سعر البيع يجب أن يكون أكبر من التكلفة', 'error'); return; }
 
         try {
-            await apiFetch('/api/sales', {
-                method: 'POST',
-                body: JSON.stringify(sale)
+            await apiFetch(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify({ name, salePrice, costPrice }) });
+            showNotification('تم تعديل المنتج بنجاح');
+            closeEditModal();
+            await loadData();
+            initSortable();
+        } catch (e) { console.error(e); }
+    }
+
+    // ------------------- السحب والإفلات (جديد) -------------------
+    let sortableInstance = null;
+
+    function initSortable() {
+        const list = document.getElementById('productsList');
+        // إذا كان هناك Sortable سابق، قم بتدميره
+        if (sortableInstance) {
+            sortableInstance.destroy();
+            sortableInstance = null;
+        }
+
+        // تأكد من أن القائمة ليست فارغة قبل تفعيل السحب
+        if (list.querySelector('.product-item')) {
+            sortableInstance = new Sortable(list, {
+                handle: '.drag-handle', // المقبض الذي يُستخدم للسحب
+                animation: 250, // سرعة الأنيميشن (بالمللي ثانية)
+                easing: "cubic-bezier(0.34, 1.56, 0.64, 1)", // أنيميشن نابض سلس
+                ghostClass: 'sortable-ghost', // شكل العنصر أثناء السحب
+                chosenClass: 'sortable-chosen',
+                direction: 'vertical',
+                onEnd: async function(evt) {
+                    // ترتيب العناصر الجديد
+                    const items = list.querySelectorAll('.product-item');
+                    const orderedIds = [];
+                    items.forEach(item => {
+                        const id = parseInt(item.dataset.id);
+                        if (!isNaN(id)) orderedIds.push(id);
+                    });
+
+                    if (orderedIds.length > 0) {
+                        try {
+                            await apiFetch('/api/products/reorder', {
+                                method: 'POST',
+                                body: JSON.stringify({ orderedIds })
+                            });
+                            showNotification('تم تحديث ترتيب المنتجات', 'info');
+                            // إعادة تحميل البيانات للتأكد من التزامن
+                            await loadData();
+                            initSortable(); // إعادة تهيئة السحب
+                        } catch (e) {
+                            console.error(e);
+                            // في حالة الخطأ، نعيد تحميل البيانات لاستعادة الترتيب القديم
+                            await loadData();
+                            initSortable();
+                        }
+                    }
+                }
             });
-            showNotification(`تم بيع ${product.name} بنجاح`);
-            // تحديث جميع البيانات بما فيها سجل اليوم
-            await loadData();
-            await displayTodaySales(); // تحديث فوري لسجل المبيعات
-        } catch (e) {
-            console.error(e);
         }
     }
 
-    // حذف مبيعة (جديد)
-    async function deleteSale(saleId) {
-        if (!confirm('هل تريد حذف هذه المبيعة؟')) return;
-        try {
-            await apiFetch(`/api/sales/${saleId}`, { method: 'DELETE' });
-            showNotification('تم حذف المبيعة');
-            await loadData();
-            await displayTodaySales();
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
-    // تحديث إحصائيات اليوم
-    async function updateTodayStats() {
-        try {
-            const stats = await apiFetch('/api/stats/today');
-            document.getElementById('todayRevenue').textContent = formatNumber(stats.revenue || 0);
-            document.getElementById('todayProfit').textContent = formatNumber(stats.profit || 0);
-            document.getElementById('todayOrders').textContent = stats.orders || 0;
-            const margin = stats.revenue > 0 ? ((stats.profit / stats.revenue) * 100).toFixed(1) : 0;
-            document.getElementById('profitMargin').textContent = margin + '%';
-        } catch (e) { console.error(e); }
-    }
-
-    // تحديث الإحصائيات العامة
-    async function updateGeneralStats() {
-        try {
-            const stats = await apiFetch('/api/stats/general');
-            document.getElementById('totalRevenue').textContent = formatNumber(stats.totalRevenue || 0);
-            document.getElementById('totalProfit').textContent = formatNumber(stats.totalProfit || 0);
-            document.getElementById('totalDays').textContent = stats.totalDays || 0;
-            document.getElementById('avgDaily').textContent = formatNumber(stats.avgDaily || 0);
-        } catch (e) { console.error(e); }
-    }
-
-    // عرض المنتجات في قائمة الإدارة
+    // ------------------- عرض المنتجات (معدل) -------------------
     function displayProducts() {
         const container = document.getElementById('productsList');
         const searchTerm = document.getElementById('searchProducts').value.toLowerCase();
@@ -337,27 +481,75 @@
         }
 
         container.innerHTML = filtered.map(p => `
-            <div class="product-item">
+            <div class="product-item" data-id="${p.id}">
+                <div class="drag-handle" title="اسحب لإعادة الترتيب">
+                    <i class="fas fa-grip-lines"></i>
+                </div>
                 <div class="product-info">
                     <h4>${p.name}</h4>
                     <p>سعر البيع: ${formatNumber(p.sale_price)} د.ع</p>
                     <p>التكلفة: ${formatNumber(p.cost_price)} د.ع</p>
                     <p>الربح: ${formatNumber(p.sale_price - p.cost_price)} د.ع</p>
                 </div>
-                <div>
-                    <button class="btn btn-danger" onclick="deleteProduct(${p.id})">
+                <div class="product-actions">
+                    <button class="btn btn-warning btn-sm" onclick="openEditModal(${p.id})" title="تعديل المنتج">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})" title="حذف المنتج">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
             </div>
         `).join('');
+
+        // بعد رسم العناصر، فعّل السحب إذا كان التبويب نشطاً
+        if (document.getElementById('products').classList.contains('active')) {
+            initSortable();
+        }
+    }
+
+    // ------------------- باقي الدوال (مبيعات، تقارير) -------------------
+    // بيع منتج (مع تحديث فوري)
+    async function sellProduct(id) {
+        const product = products.find(p => p.id === id);
+        if (!product) return;
+        const now = new Date();
+        const date = now.toISOString().split('T')[0];
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const time = `${hours}:${minutes}:${seconds}`;
+
+        const sale = {
+            productId: product.id, productName: product.name,
+            salePrice: product.sale_price, costPrice: product.cost_price,
+            profit: product.sale_price - product.cost_price,
+            date, time
+        };
+        try {
+            await apiFetch('/api/sales', { method: 'POST', body: JSON.stringify(sale) });
+            showNotification(`تم بيع ${product.name} بنجاح`);
+            await loadData();
+            await displayTodaySales();
+        } catch (e) { console.error(e); }
+    }
+
+    // حذف مبيعة
+    async function deleteSale(saleId) {
+        if (!confirm('هل تريد حذف هذه المبيعة؟')) return;
+        try {
+            await apiFetch(`/api/sales/${saleId}`, { method: 'DELETE' });
+            showNotification('تم حذف المبيعة');
+            await loadData();
+            await displayTodaySales();
+        } catch (e) { console.error(e); }
     }
 
     // عرض منتجات نقاط البيع
     function displaySalesProducts() {
         const container = document.getElementById('salesProducts');
         if (products.length === 0) {
-            container.innerHTML = `<div class="empty-state"><i class="fas fa-bicycle"></i><p>لا توجد منتجات، أضف منتجات من قسم الإدارة</p></div>`;
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-bicycle"></i><p>لا توجد منتجات</p></div>`;
             return;
         }
         container.innerHTML = products.map(p => `
@@ -368,7 +560,7 @@
         `).join('');
     }
 
-    // عرض مبيعات اليوم مع زر حذف (معدل)
+    // عرض مبيعات اليوم
     async function displayTodaySales() {
         const container = document.getElementById('todaySales');
         const today = new Date().toISOString().split('T')[0];
@@ -387,12 +579,33 @@
                     </div>
                     <div class="sale-actions">
                         <span style="font-weight: bold; margin-left: 10px;">${formatNumber(s.sale_price)} د.ع</span>
-                        <button class="btn btn-danger btn-sm" onclick="deleteSale(${s.id})">
-                            <i class="fas fa-times"></i>
-                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteSale(${s.id})"><i class="fas fa-times"></i></button>
                     </div>
                 </div>
             `).join('');
+        } catch (e) { console.error(e); }
+    }
+
+    // تحديث إحصائيات اليوم
+    async function updateTodayStats() {
+        try {
+            const stats = await apiFetch('/api/stats/today');
+            document.getElementById('todayRevenue').textContent = formatNumber(stats.revenue || 0);
+            document.getElementById('todayProfit').textContent = formatNumber(stats.profit || 0);
+            document.getElementById('todayOrders').textContent = stats.orders || 0;
+            const margin = stats.revenue > 0 ? ((stats.profit / stats.revenue) * 100).toFixed(1) : 0;
+            document.getElementById('profitMargin').textContent = margin + '%';
+        } catch (e) { console.error(e); }
+    }
+
+    // تحديث إحصائيات عامة
+    async function updateGeneralStats() {
+        try {
+            const stats = await apiFetch('/api/stats/general');
+            document.getElementById('totalRevenue').textContent = formatNumber(stats.totalRevenue || 0);
+            document.getElementById('totalProfit').textContent = formatNumber(stats.totalProfit || 0);
+            document.getElementById('totalDays').textContent = stats.totalDays || 0;
+            document.getElementById('avgDaily').textContent = formatNumber(stats.avgDaily || 0);
         } catch (e) { console.error(e); }
     }
 
@@ -401,13 +614,10 @@
         showNotification('جميع المبيعات محفوظة تلقائياً في قاعدة البيانات', 'info');
     }
 
-    // إنشاء تقرير يومي
+    // التقارير
     async function generateReport() {
         const selectedDate = document.getElementById('reportDate').value;
-        if (!selectedDate) {
-            showNotification('يرجى اختيار تاريخ', 'error');
-            return;
-        }
+        if (!selectedDate) { showNotification('يرجى اختيار تاريخ', 'error'); return; }
         try {
             const sales = await apiFetch(`/api/sales?date=${selectedDate}`);
             const revenue = sales.reduce((sum, s) => sum + s.sale_price, 0);
@@ -430,7 +640,6 @@
         } catch (e) { console.error(e); }
     }
 
-    // طباعة التقرير
     function printReport() {
         const selectedDate = document.getElementById('reportDate').value;
         if (!selectedDate) return;
@@ -438,7 +647,6 @@
         const revenue = document.getElementById('reportRevenue').textContent;
         const profit = document.getElementById('reportProfit').textContent;
         const orders = document.getElementById('reportOrders').textContent;
-
         const printWindow = window.open('', '_blank');
         printWindow.document.write(`
             <html dir="rtl"><head><title>تقرير ${selectedDate}</title>
@@ -453,7 +661,7 @@
         printWindow.document.close();
     }
 
-    // إعداد التبويبات والأحداث
+    // إعداد التبويبات
     function setupTabs() {
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => {
@@ -463,11 +671,15 @@
                 document.getElementById(tab.dataset.tab).classList.add('active');
                 if (tab.dataset.tab === 'reports') generateReport();
                 if (tab.dataset.tab === 'sales') displayTodaySales();
+                if (tab.dataset.tab === 'products') {
+                    // إعادة تهيئة السحب عند التبديل إلى تبويب المنتجات
+                    setTimeout(() => initSortable(), 100);
+                }
             });
         });
     }
 
-    // تهيئة النظام
+    // ------------------- التهيئة -------------------
     document.addEventListener('DOMContentLoaded', () => {
         setupTabs();
         document.getElementById('productForm').addEventListener('submit', (e) => { e.preventDefault(); addProduct(); });
@@ -476,10 +688,18 @@
         document.getElementById('generateReport').addEventListener('click', generateReport);
         document.getElementById('printReport').addEventListener('click', printReport);
         document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+        
+        // نموذج التعديل
+        document.getElementById('editForm').addEventListener('submit', updateProduct);
+        // إغلاق المودال عند الضغط خارجها
+        document.getElementById('editModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeEditModal();
+        });
 
         loadData();
         displayTodaySales();
-        // تحديث كل 15 ثانية (للمزامنة السريعة بين الأجهزة)
+        
+        // تحديث دوري
         setInterval(() => {
             loadData();
             displayTodaySales();
