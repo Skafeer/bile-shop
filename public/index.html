@@ -741,20 +741,30 @@
         }
     }
 
-    // بيع منتج
+    // بيع منتج (النسخة المعدلة)
     async function sellProduct(id) {
         const product = products.find(p => p.id === id);
         if (!product) return;
 
         const now = new Date();
+
+        // تاريخ بصيغة YYYY-MM-DD
+        const date = now.toISOString().split('T')[0];
+
+        // وقت بصيغة HH:MM:SS (24 ساعة) بدون أحرف
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const time = `${hours}:${minutes}:${seconds}`;
+
         const sale = {
             productId: product.id,
             productName: product.name,
             salePrice: product.sale_price,
             costPrice: product.cost_price,
             profit: product.sale_price - product.cost_price,
-            date: now.toISOString().split('T')[0],
-            time: now.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            date: date,
+            time: time
         };
 
         try {
