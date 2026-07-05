@@ -31,10 +31,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ------------------- إنشاء الجداول -------------------
+// ------------------- إنشاء الجداول وإضافة الأعمدة المفقودة -------------------
 const initDB = async () => {
     try {
-        // إضافة عمود sort_order لترتيب المنتجات
+        // 1. إنشاء جدول products إذا لم يكن موجوداً
         await pool.query(`
             CREATE TABLE IF NOT EXISTS products (
                 id SERIAL PRIMARY KEY,
@@ -45,6 +45,20 @@ const initDB = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
+
+        // 2. التحقق من وجود عمود sort_order وإضافته إذا كان مفقوداً (للقواعد القديمة)
+        const checkColumn = await pool.query(`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='products' AND column_name='sort_order'
+        `);
+        if (checkColumn.rowCount === 0) {
+            console.log('⚠️ عمود sort_order غير موجود، جاري إضافته...');
+            await pool.query('ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 0;');
+            console.log('✅ تم إضافة عمود sort_order');
+        }
+
+        // 3. إنشاء باقي الجداول
         await pool.query(`
             CREATE TABLE IF NOT EXISTS sales (
                 id SERIAL PRIMARY KEY,
@@ -107,7 +121,6 @@ app.post('/api/products', async (req, res) => {
     }
 
     try {
-        // جلب أكبر sort_order لإضافة الجديد بعده
         const maxOrder = await pool.query('SELECT COALESCE(MAX(sort_order), 0) as max FROM products');
         const newOrder = parseInt(maxOrder.rows[0].max) + 1;
 
@@ -122,7 +135,7 @@ app.post('/api/products', async (req, res) => {
     }
 });
 
-// تعديل منتج (جديد)
+// تعديل منتج
 app.put('/api/products/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     const { name, salePrice, costPrice } = req.body;
@@ -158,15 +171,14 @@ app.put('/api/products/:id', async (req, res) => {
     }
 });
 
-// إعادة ترتيب المنتجات (جديد)
+// إعادة ترتيب المنتجات
 app.post('/api/products/reorder', async (req, res) => {
-    const { orderedIds } = req.body; // قائمة بالـ IDs بالترتيب الجديد
+    const { orderedIds } = req.body;
     if (!orderedIds || !Array.isArray(orderedIds) || orderedIds.length === 0) {
         return res.status(400).json({ error: 'بيانات غير صالحة' });
     }
 
     try {
-        // استخدام معاملة (Transaction) لتحديث جميع المنتجات دفعة واحدة
         await pool.query('BEGIN');
         for (let i = 0; i < orderedIds.length; i++) {
             const id = parseInt(orderedIds[i]);
@@ -200,8 +212,7 @@ app.delete('/api/products/:id', async (req, res) => {
     }
 });
 
-// ------------------- باقي واجهات API (المبيعات والتقارير) -------------------
-// (نفس الكود السابق، ولكن أضيفت هنا للاختصار، تأكد من نسخها كاملة من الرد السابق)
+// ------------------- واجهات المبيعات والتقارير -------------------
 
 // تسجيل مبيعة جديدة
 app.post('/api/sales', async (req, res) => {
@@ -293,7 +304,7 @@ app.get('/api/stats/general', async (req, res) => {
     }
 });
 
-// مهمة منتصف الليل
+// مهمة منتصف الليل (بتوقيت العراق)
 cron.schedule('0 21 * * *', async () => {
     const todayStr = new Date().toISOString().split('T')[0];
     console.log(`⏰ جاري حفظ ملخص اليوم ${todayStr}...`);
@@ -305,6 +316,7 @@ cron.schedule('0 21 * * *', async () => {
     } catch (err) { console.error('❌ خطأ في المهمة المجدولة:', err.message); }
 });
 
+// تقديم الواجهة الأمامية
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
