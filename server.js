@@ -147,17 +147,58 @@ app.post('/api/sales', async (req, res) => {
     if (!productId || !productName || salePrice == null || costPrice == null || profit == null || !date || !time) {
         return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
     }
+
+    // التحقق من صيغة الوقت (HH:MM:SS)
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/;
+    if (!timeRegex.test(time)) {
+        return res.status(400).json({ error: 'صيغة الوقت غير صحيحة، يجب أن تكون HH:MM:SS' });
+    }
+
     try {
-        await pool.query(
+        // تحقق من وجود المنتج في قاعدة البيانات
+        const productCheck = await pool.query('SELECT id FROM products WHERE id = $1', [parseInt(productId)]);
+        if (productCheck.rowCount === 0) {
+            return res.status(404).json({ error: 'المنتج غير موجود في قاعدة البيانات' });
+        }
+
+        // إدراج المبيعة
+        const result = await pool.query(
             `INSERT INTO sales 
              (product_id, product_name, sale_price, cost_price, profit, sale_date, sale_time)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [parseInt(productId), productName, parseInt(salePrice), parseInt(costPrice), parseInt(profit), date, time]
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING id`,
+            [
+                parseInt(productId), 
+                productName, 
+                parseInt(salePrice), 
+                parseInt(costPrice), 
+                parseInt(profit), 
+                date, 
+                time
+            ]
         );
-        res.status(201).json({ success: true });
+        res.status(201).json({ success: true, id: result.rows[0].id });
     } catch (err) {
         console.error('خطأ في POST /api/sales:', err.message);
-        res.status(500).json({ error: 'فشل في تسجيل المبيعة' });
+        res.status(500).json({ error: 'فشل في تسجيل المبيعة: ' + err.message });
+    }
+});
+
+// حذف مبيعة (جديد)
+app.delete('/api/sales/:id', async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+        return res.status(400).json({ error: 'معرف المبيعة غير صحيح' });
+    }
+    try {
+        const result = await pool.query('DELETE FROM sales WHERE id = $1 RETURNING id', [id]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'المبيعة غير موجودة' });
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('خطأ في DELETE /api/sales/:id:', err.message);
+        res.status(500).json({ error: 'فشل في حذف المبيعة' });
     }
 });
 
@@ -203,7 +244,11 @@ app.get('/api/stats/today', async (req, res) => {
              FROM sales WHERE sale_date = $1`,
             [today]
         );
-        res.json(result.rows[0]);
+        res.json({
+            revenue: parseInt(result.rows[0].revenue),
+            profit: parseInt(result.rows[0].profit),
+            orders: parseInt(result.rows[0].orders)
+        });
     } catch (err) {
         console.error('خطأ في /api/stats/today:', err.message);
         res.status(500).json({ error: 'فشل في جلب إحصائيات اليوم' });
@@ -224,10 +269,11 @@ app.get('/api/stats/general', async (req, res) => {
             `SELECT COUNT(DISTINCT sale_date) as total_days FROM sales`
         );
         const totalDays = parseInt(days.rows[0].total_days) || 0;
-        const avgDaily = totalDays > 0 ? Math.round(totals.rows[0].total_revenue / totalDays) : 0;
+        const totalRevenue = parseInt(totals.rows[0].total_revenue);
+        const avgDaily = totalDays > 0 ? Math.round(totalRevenue / totalDays) : 0;
 
         res.json({
-            totalRevenue: parseInt(totals.rows[0].total_revenue),
+            totalRevenue: totalRevenue,
             totalProfit: parseInt(totals.rows[0].total_profit),
             totalDays: totalDays,
             avgDaily: avgDaily
@@ -263,9 +309,9 @@ cron.schedule('0 21 * * *', async () => {
              total_revenue = EXCLUDED.total_revenue,
              total_profit = EXCLUDED.total_profit,
              total_orders = EXCLUDED.total_orders`,
-            [todayStr, revenue, profit, orders]
+            [todayStr, parseInt(revenue), parseInt(profit), parseInt(orders)]
         );
-        console.log(`✅ تم حفظ تقرير ${todayStr}: إيرادات ${revenue}, أرباح ${profit}, عدد ${orders}`);
+        console.log(`✅ تم حفظ تقرير ${todayStr}: إيرادات ${parseInt(revenue)}, أرباح ${parseInt(profit)}, عدد ${parseInt(orders)}`);
     } catch (err) {
         console.error('❌ خطأ في المهمة المجدولة:', err.message);
     }
