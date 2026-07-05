@@ -7,17 +7,35 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// التحقق من وجود متغير قاعدة البيانات
+if (!process.env.DATABASE_URL) {
+    console.error('❌ متغير DATABASE_URL غير موجود. تأكد من إضافته في Railway Variables.');
+    process.exit(1);
+}
+
+// إعداد الاتصال بقاعدة البيانات
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false // مطلوب لـ Railway
+    }
+});
+
+// اختبار الاتصال فور بدء الخادم
+pool.connect((err) => {
+    if (err) {
+        console.error('❌ فشل الاتصال بقاعدة البيانات:', err.message);
+        process.exit(1);
+    } else {
+        console.log('✅ تم الاتصال بقاعدة البيانات بنجاح');
+    }
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// الاتصال بقاعدة البيانات (Railway يوفر DATABASE_URL تلقائياً)
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-});
-
-// إنشاء الجداول تلقائياً عند التشغيل الأول
+// ------------------- إنشاء الجداول تلقائياً -------------------
 const initDB = async () => {
     try {
         await pool.query(`
@@ -28,6 +46,8 @@ const initDB = async () => {
                 cost_price INTEGER NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+        `);
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS sales (
                 id SERIAL PRIMARY KEY,
                 product_id INTEGER REFERENCES products(id),
@@ -39,6 +59,8 @@ const initDB = async () => {
                 sale_time TIME NOT NULL,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+        `);
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS daily_reports (
                 id SERIAL PRIMARY KEY,
                 report_date DATE UNIQUE NOT NULL,
@@ -48,9 +70,10 @@ const initDB = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
-        console.log('✅ قاعدة البيانات جاهزة');
+        console.log('✅ جميع الجداول جاهزة (أو موجودة مسبقاً)');
     } catch (err) {
-        console.error('❌ خطأ في قاعدة البيانات:', err);
+        console.error('❌ خطأ في إنشاء الجداول:', err.message);
+        process.exit(1);
     }
 };
 initDB();
@@ -63,49 +86,78 @@ app.get('/api/products', async (req, res) => {
         const result = await pool.query('SELECT * FROM products ORDER BY id');
         res.json(result.rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('خطأ في /api/products:', err.message);
+        res.status(500).json({ error: 'حدث خطأ في جلب المنتجات' });
     }
 });
 
 // إضافة منتج جديد
 app.post('/api/products', async (req, res) => {
     const { name, salePrice, costPrice } = req.body;
-    if (!name || salePrice == null || costPrice == null) {
-        return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+    
+    // التحقق من صحة المدخلات
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+        return res.status(400).json({ error: 'اسم المنتج مطلوب' });
     }
+    if (salePrice === undefined || isNaN(parseInt(salePrice)) || parseInt(salePrice) < 0) {
+        return res.status(400).json({ error: 'سعر البيع يجب أن يكون رقم موجب' });
+    }
+    if (costPrice === undefined || isNaN(parseInt(costPrice)) || parseInt(costPrice) < 0) {
+        return res.status(400).json({ error: 'التكلفة يجب أن تكون رقم موجب' });
+    }
+    if (parseInt(salePrice) <= parseInt(costPrice)) {
+        return res.status(400).json({ error: 'سعر البيع يجب أن يكون أكبر من التكلفة' });
+    }
+
     try {
         const result = await pool.query(
             'INSERT INTO products (name, sale_price, cost_price) VALUES ($1, $2, $3) RETURNING *',
-            [name, salePrice, costPrice]
+            [name.trim(), parseInt(salePrice), parseInt(costPrice)]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('خطأ في POST /api/products:', err.message);
+        res.status(500).json({ error: 'فشل في إضافة المنتج' });
     }
 });
 
 // حذف منتج
 app.delete('/api/products/:id', async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+        return res.status(400).json({ error: 'معرف المنتج غير صحيح' });
+    }
     try {
-        await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
+        const result = await pool.query('DELETE FROM products WHERE id = $1 RETURNING id', [id]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'المنتج غير موجود' });
+        }
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('خطأ في DELETE /api/products/:id:', err.message);
+        res.status(500).json({ error: 'فشل في حذف المنتج' });
     }
 });
 
 // تسجيل مبيعة جديدة
 app.post('/api/sales', async (req, res) => {
     const { productId, productName, salePrice, costPrice, profit, date, time } = req.body;
+    
+    // التحقق من صحة البيانات
+    if (!productId || !productName || salePrice == null || costPrice == null || profit == null || !date || !time) {
+        return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+    }
     try {
         await pool.query(
-            `INSERT INTO sales (product_id, product_name, sale_price, cost_price, profit, sale_date, sale_time)
+            `INSERT INTO sales 
+             (product_id, product_name, sale_price, cost_price, profit, sale_date, sale_time)
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [productId, productName, salePrice, costPrice, profit, date, time]
+            [parseInt(productId), productName, parseInt(salePrice), parseInt(costPrice), parseInt(profit), date, time]
         );
         res.status(201).json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('خطأ في POST /api/sales:', err.message);
+        res.status(500).json({ error: 'فشل في تسجيل المبيعة' });
     }
 });
 
@@ -113,8 +165,8 @@ app.post('/api/sales', async (req, res) => {
 app.get('/api/sales', async (req, res) => {
     const { date, startDate, endDate } = req.query;
     let query = 'SELECT * FROM sales';
-    let params = [];
-    let conditions = [];
+    const params = [];
+    const conditions = [];
 
     if (date) {
         conditions.push(`sale_date = $${params.length + 1}`);
@@ -134,7 +186,8 @@ app.get('/api/sales', async (req, res) => {
         const result = await pool.query(query, params);
         res.json(result.rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('خطأ في /api/sales:', err.message);
+        res.status(500).json({ error: 'فشل في جلب المبيعات' });
     }
 });
 
@@ -152,11 +205,12 @@ app.get('/api/stats/today', async (req, res) => {
         );
         res.json(result.rows[0]);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('خطأ في /api/stats/today:', err.message);
+        res.status(500).json({ error: 'فشل في جلب إحصائيات اليوم' });
     }
 });
 
-// إحصائيات عامة (كل المبيعات)
+// إحصائيات عامة
 app.get('/api/stats/general', async (req, res) => {
     try {
         const totals = await pool.query(
@@ -173,22 +227,23 @@ app.get('/api/stats/general', async (req, res) => {
         const avgDaily = totalDays > 0 ? Math.round(totals.rows[0].total_revenue / totalDays) : 0;
 
         res.json({
-            totalRevenue: totals.rows[0].total_revenue,
-            totalProfit: totals.rows[0].total_profit,
+            totalRevenue: parseInt(totals.rows[0].total_revenue),
+            totalProfit: parseInt(totals.rows[0].total_profit),
             totalDays: totalDays,
             avgDaily: avgDaily
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('خطأ في /api/stats/general:', err.message);
+        res.status(500).json({ error: 'فشل في جلب الإحصائيات العامة' });
     }
 });
 
-// ------------------- مهمة منتصف الليل (الساعة 12 بالضبط بتوقيت العراق) -------------------
-// توقيت العراق = UTC+3، لذلك الساعة 21 بتوقيت UTC = 12 منتصف الليل بتوقيت بغداد
+// ------------------- مهمة منتصف الليل (بتوقيت العراق) -------------------
+// الساعة 21:00 بتوقيت UTC = 12:00 منتصف الليل بتوقيت بغداد (UTC+3)
 cron.schedule('0 21 * * *', async () => {
-    console.log('⏰ جاري حفظ ملخص اليوم في قاعدة البيانات...');
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
+    console.log(`⏰ جاري حفظ ملخص اليوم ${todayStr} في قاعدة البيانات...`);
     
     try {
         const stats = await pool.query(
@@ -210,17 +265,19 @@ cron.schedule('0 21 * * *', async () => {
              total_orders = EXCLUDED.total_orders`,
             [todayStr, revenue, profit, orders]
         );
-        console.log(`✅ تم حفظ تقرير ${todayStr}: إيرادات ${revenue}, عدد ${orders}`);
+        console.log(`✅ تم حفظ تقرير ${todayStr}: إيرادات ${revenue}, أرباح ${profit}, عدد ${orders}`);
     } catch (err) {
-        console.error('❌ خطأ في المهمة المجدولة:', err);
+        console.error('❌ خطأ في المهمة المجدولة:', err.message);
     }
 });
 
-// تقديم الواجهة الأمامية
+// تقديم الواجهة الأمامية (لأي مسار غير الـ API)
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// بدء الخادم
 app.listen(port, () => {
-    console.log(`🚀 السيرفر شغال على المنفذ ${port}`);
+    console.log(`🚀 السيرفر يعمل على المنفذ ${port}`);
+    console.log(`📊 رابط التطبيق: http://localhost:${port}`);
 });
