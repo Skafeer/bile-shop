@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <style>
-        /* --- جميع الأنماط (نفس السابق مع إضافة طفيفة للبحث) --- */
+        /* --- جميع الأنماط (نفس السابق) --- */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Tajawal', sans-serif; background: linear-gradient(135deg, #FFF5DF 0%, #F5E6D3 100%); min-height: 100vh; direction: rtl; }
         .header { background: linear-gradient(135deg, #121B38 0%, #1a2854 100%); color: white; padding: 20px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
@@ -80,7 +80,7 @@
         .modal-box .form-actions { display: flex; gap: 10px; margin-top: 20px; }
         .modal-box .form-actions .btn { flex: 1; }
         .modal-box .btn-close-modal { background: #6c757d; }
-        @media (max-width: 768px) { .tabs { flex-direction: column; } .header h1 { font-size: 2rem; } .container { padding: 10px; } .products-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } .summary-grid { grid-template-columns: 1fr; } .date-filter { flex-direction: column; align-items: stretch; } .product-item { flex-wrap: wrap; gap: 10px; } }
+        @media (max-width: 768px) { .tabs { flex-direction: column; } .header h1 { font-size: 2rem; } .container { padding: 10px; } .products-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } .summary-grid { grid-template-columns: 1fr 1fr; } .date-filter { flex-direction: column; align-items: stretch; } .product-item { flex-wrap: wrap; gap: 10px; } }
         .notification { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 15px 25px; border-radius: 8px; color: white; font-weight: 500; z-index: 3000; animation: slideDown 0.3s ease; }
         .notification.success { background: #28a745; }
         .notification.error { background: #dc3545; }
@@ -101,22 +101,34 @@
             <button class="tab" data-tab="reports"><i class="fas fa-chart-bar"></i> التقارير المالية</button>
         </div>
 
-        <!-- نقاط البيع (مع حقل بحث) -->
+        <!-- نقاط البيع -->
         <div class="tab-content active" id="sales">
             <h2 class="section-title"><i class="fas fa-shopping-cart"></i> نقاط البيع</h2>
             <div class="sales-summary">
                 <h3 style="margin-bottom: 20px; text-align: center;"><i class="fas fa-calendar-day"></i> ملخص مبيعات اليوم</h3>
                 <div class="summary-grid">
-                    <div class="summary-item"><h3 id="todayRevenue">0</h3><p>إجمالي المبيعات (د.ع)</p></div>
-                    <div class="summary-item"><h3 id="todayProfit">0</h3><p>صافي الربح (د.ع)</p></div>
-                    <div class="summary-item"><h3 id="todayOrders">0</h3><p>عدد المبيعات</p></div>
-                    <div class="summary-item"><h3 id="profitMargin">0%</h3><p>هامش الربح</p></div>
+                    <!-- الترتيب الجديد: إجمالي المبيعات، إجمالي التكلفة، صافي الربح، عدد المبيعات -->
+                    <div class="summary-item">
+                        <h3 id="todayRevenue">0</h3>
+                        <p>إجمالي المبيعات (د.ع)</p>
+                    </div>
+                    <div class="summary-item">
+                        <h3 id="todayCost">0</h3>
+                        <p>إجمالي التكلفة (د.ع)</p>
+                    </div>
+                    <div class="summary-item">
+                        <h3 id="todayProfit">0</h3>
+                        <p>صافي الربح (د.ع)</p>
+                    </div>
+                    <div class="summary-item">
+                        <h3 id="todayOrders">0</h3>
+                        <p>عدد المبيعات</p>
+                    </div>
                 </div>
             </div>
             <div class="grid">
                 <div class="card">
                     <h3 style="margin-bottom: 20px; color: #121B38;"><i class="fas fa-bicycle"></i> المنتجات المتاحة</h3>
-                    <!-- حقل البحث الجديد -->
                     <div class="search-box" style="margin-bottom: 15px;">
                         <input type="text" id="searchSalesProducts" placeholder="ابحث عن منتج...">
                         <i class="fas fa-search"></i>
@@ -133,7 +145,7 @@
             </div>
         </div>
 
-        <!-- إدارة المنتجات (نفس السابق) -->
+        <!-- إدارة المنتجات -->
         <div class="tab-content" id="products">
             <h2 class="section-title"><i class="fas fa-bicycle"></i> إدارة المنتجات</h2>
             <div class="grid">
@@ -154,7 +166,7 @@
             </div>
         </div>
 
-        <!-- التقارير (نفس السابق) -->
+        <!-- التقارير المالية -->
         <div class="tab-content" id="reports">
             <h2 class="section-title"><i class="fas fa-chart-bar"></i> التقارير المالية</h2>
             <div class="date-filter">
@@ -209,7 +221,7 @@
     </div>
 
 <script>
-    // ------------------- جميع الدوال (مع تعديل displaySalesProducts) -------------------
+    // ------------------- المتغيرات والدوال المساعدة -------------------
     let products = [];
     let sortableInstance = null;
 
@@ -225,6 +237,7 @@
         setTimeout(() => notification.remove(), 3000);
     }
 
+    // ------------------- API Calls -------------------
     async function apiFetch(url, options = {}) {
         try {
             const res = await fetch(url, {
@@ -242,10 +255,10 @@
         }
     }
 
+    // ------------------- تحميل البيانات -------------------
     async function loadData() {
         try {
             products = await apiFetch('/api/products');
-            // تمرير قيمة البحث الحالية عند العرض
             const searchValue = document.getElementById('searchSalesProducts')?.value || '';
             displayProducts();
             displaySalesProducts(searchValue);
@@ -255,35 +268,7 @@
         } catch (e) { console.error(e); }
     }
 
-    // ------------------- عرض منتجات نقاط البيع مع التصفية -------------------
-    function displaySalesProducts(filter = '') {
-        const container = document.getElementById('salesProducts');
-        const searchTerm = filter.toLowerCase().trim();
-        
-        const filtered = products.filter(p => 
-            p.name.toLowerCase().includes(searchTerm)
-        );
-
-        if (filtered.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-bicycle"></i>
-                    <p>${searchTerm ? 'لا توجد منتجات تطابق "' + filter + '"' : 'لا توجد منتجات متاحة'}</p>
-                    ${!searchTerm ? '<p>يرجى إضافة منتجات من قسم إدارة المنتجات</p>' : ''}
-                </div>
-            `;
-            return;
-        }
-
-        container.innerHTML = filtered.map(p => `
-            <div class="product-btn" onclick="sellProduct(${p.id})">
-                <h4>${p.name}</h4>
-                <div class="price">${formatNumber(p.sale_price)} د.ع</div>
-            </div>
-        `).join('');
-    }
-
-    // ------------------- باقي الدوال (نفس السابق) -------------------
+    // ------------------- إدارة المنتجات -------------------
     async function addProduct() {
         const name = document.getElementById('productName').value.trim();
         const salePrice = parseInt(document.getElementById('salePrice').value);
@@ -307,6 +292,7 @@
         } catch (e) { console.error(e); }
     }
 
+    // ------------------- تعديل المنتج -------------------
     function openEditModal(id) {
         const product = products.find(p => p.id === id);
         if (!product) return;
@@ -374,7 +360,7 @@
         });
     }
 
-    // عرض المنتجات في قائمة الإدارة
+    // ------------------- عرض المنتجات -------------------
     function displayProducts() {
         const container = document.getElementById('productsList');
         const searchTerm = document.getElementById('searchProducts').value.toLowerCase();
@@ -403,7 +389,30 @@
         }
     }
 
-    // ------------------- دوال المبيعات والتقارير -------------------
+    // ------------------- عرض منتجات نقاط البيع مع البحث -------------------
+    function displaySalesProducts(filter = '') {
+        const container = document.getElementById('salesProducts');
+        const searchTerm = filter.toLowerCase().trim();
+        const filtered = products.filter(p => p.name.toLowerCase().includes(searchTerm));
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-bicycle"></i>
+                    <p>${searchTerm ? 'لا توجد منتجات تطابق "' + filter + '"' : 'لا توجد منتجات متاحة'}</p>
+                    ${!searchTerm ? '<p>يرجى إضافة منتجات من قسم إدارة المنتجات</p>' : ''}
+                </div>
+            `;
+            return;
+        }
+        container.innerHTML = filtered.map(p => `
+            <div class="product-btn" onclick="sellProduct(${p.id})">
+                <h4>${p.name}</h4>
+                <div class="price">${formatNumber(p.sale_price)} د.ع</div>
+            </div>
+        `).join('');
+    }
+
+    // ------------------- دوال المبيعات -------------------
     async function sellProduct(id) {
         const product = products.find(p => p.id === id);
         if (!product) return;
@@ -462,14 +471,14 @@
         } catch (e) { console.error(e); }
     }
 
+    // ------------------- تحديث الإحصائيات (معدل) -------------------
     async function updateTodayStats() {
         try {
             const stats = await apiFetch('/api/stats/today');
             document.getElementById('todayRevenue').textContent = formatNumber(stats.revenue || 0);
+            document.getElementById('todayCost').textContent = formatNumber(stats.totalCost || 0);
             document.getElementById('todayProfit').textContent = formatNumber(stats.profit || 0);
             document.getElementById('todayOrders').textContent = stats.orders || 0;
-            const margin = stats.revenue > 0 ? ((stats.profit / stats.revenue) * 100).toFixed(1) : 0;
-            document.getElementById('profitMargin').textContent = margin + '%';
         } catch (e) { console.error(e); }
     }
 
@@ -483,6 +492,7 @@
         } catch (e) { console.error(e); }
     }
 
+    // ------------------- التقارير -------------------
     function saveDailySales() { showNotification('جميع المبيعات محفوظة تلقائياً في قاعدة البيانات', 'info'); }
 
     async function generateReport() {
@@ -541,7 +551,6 @@
                 if (tab.dataset.tab === 'reports') generateReport();
                 if (tab.dataset.tab === 'sales') {
                     displayTodaySales();
-                    // إعادة عرض المنتجات مع الحفاظ على قيمة البحث
                     const searchVal = document.getElementById('searchSalesProducts').value || '';
                     displaySalesProducts(searchVal);
                 }
@@ -562,7 +571,6 @@
         document.getElementById('printReport').addEventListener('click', printReport);
         document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
 
-        // ربط حقل البحث في نقاط البيع
         document.getElementById('searchSalesProducts').addEventListener('input', function() {
             displaySalesProducts(this.value);
         });
