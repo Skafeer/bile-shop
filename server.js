@@ -77,6 +77,7 @@ const initDB = async () => {
                 id SERIAL PRIMARY KEY,
                 report_date DATE UNIQUE NOT NULL,
                 total_revenue INTEGER DEFAULT 0,
+                total_cost INTEGER DEFAULT 0,
                 total_profit INTEGER DEFAULT 0,
                 total_orders INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -212,8 +213,6 @@ app.delete('/api/products/:id', async (req, res) => {
     }
 });
 
-// ------------------- واجهات المبيعات والتقارير -------------------
-
 // تسجيل مبيعة جديدة
 app.post('/api/sales', async (req, res) => {
     const { productId, productName, salePrice, costPrice, profit, date, time } = req.body;
@@ -274,15 +273,25 @@ app.get('/api/sales', async (req, res) => {
     }
 });
 
-// إحصائيات اليوم
+// إحصائيات اليوم (مع إجمالي التكلفة)
 app.get('/api/stats/today', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     try {
         const result = await pool.query(
-            `SELECT COALESCE(SUM(sale_price), 0) as revenue, COALESCE(SUM(profit), 0) as profit, COUNT(*) as orders
-             FROM sales WHERE sale_date = $1`, [today]
+            `SELECT 
+                COALESCE(SUM(sale_price), 0) as revenue,
+                COALESCE(SUM(cost_price), 0) as total_cost,
+                COALESCE(SUM(profit), 0) as profit,
+                COUNT(*) as orders
+             FROM sales WHERE sale_date = $1`,
+            [today]
         );
-        res.json({ revenue: parseInt(result.rows[0].revenue), profit: parseInt(result.rows[0].profit), orders: parseInt(result.rows[0].orders) });
+        res.json({
+            revenue: parseInt(result.rows[0].revenue),
+            totalCost: parseInt(result.rows[0].total_cost),
+            profit: parseInt(result.rows[0].profit),
+            orders: parseInt(result.rows[0].orders)
+        });
     } catch (err) {
         console.error('خطأ في /api/stats/today:', err.message);
         res.status(500).json({ error: 'فشل في جلب إحصائيات اليوم' });
@@ -297,23 +306,48 @@ app.get('/api/stats/general', async (req, res) => {
         const totalDays = parseInt(days.rows[0].total_days) || 0;
         const totalRevenue = parseInt(totals.rows[0].total_revenue);
         const avgDaily = totalDays > 0 ? Math.round(totalRevenue / totalDays) : 0;
-        res.json({ totalRevenue, totalProfit: parseInt(totals.rows[0].total_profit), totalDays, avgDaily });
+        res.json({
+            totalRevenue: totalRevenue,
+            totalProfit: parseInt(totals.rows[0].total_profit),
+            totalDays: totalDays,
+            avgDaily: avgDaily
+        });
     } catch (err) {
         console.error('خطأ في /api/stats/general:', err.message);
         res.status(500).json({ error: 'فشل في جلب الإحصائيات العامة' });
     }
 });
 
-// مهمة منتصف الليل (بتوقيت العراق)
+// ------------------- مهمة منتصف الليل (بتوقيت العراق) -------------------
+// الساعة 21:00 بتوقيت UTC = 12:00 منتصف الليل بتوقيت بغداد (UTC+3)
 cron.schedule('0 21 * * *', async () => {
     const todayStr = new Date().toISOString().split('T')[0];
     console.log(`⏰ جاري حفظ ملخص اليوم ${todayStr}...`);
     try {
-        const stats = await pool.query(`SELECT COALESCE(SUM(sale_price), 0) as revenue, COALESCE(SUM(profit), 0) as profit, COUNT(*) as orders FROM sales WHERE sale_date = $1`, [todayStr]);
-        const { revenue, profit, orders } = stats.rows[0];
-        await pool.query(`INSERT INTO daily_reports (report_date, total_revenue, total_profit, total_orders) VALUES ($1, $2, $3, $4) ON CONFLICT (report_date) DO UPDATE SET total_revenue = EXCLUDED.total_revenue, total_profit = EXCLUDED.total_profit, total_orders = EXCLUDED.total_orders`, [todayStr, parseInt(revenue), parseInt(profit), parseInt(orders)]);
-        console.log(`✅ تم حفظ تقرير ${todayStr}`);
-    } catch (err) { console.error('❌ خطأ في المهمة المجدولة:', err.message); }
+        const stats = await pool.query(
+            `SELECT 
+                COALESCE(SUM(sale_price), 0) as revenue,
+                COALESCE(SUM(cost_price), 0) as total_cost,
+                COALESCE(SUM(profit), 0) as profit,
+                COUNT(*) as orders
+             FROM sales WHERE sale_date = $1`,
+            [todayStr]
+        );
+        const { revenue, total_cost, profit, orders } = stats.rows[0];
+        await pool.query(
+            `INSERT INTO daily_reports (report_date, total_revenue, total_cost, total_profit, total_orders)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (report_date) DO UPDATE SET
+             total_revenue = EXCLUDED.total_revenue,
+             total_cost = EXCLUDED.total_cost,
+             total_profit = EXCLUDED.total_profit,
+             total_orders = EXCLUDED.total_orders`,
+            [todayStr, parseInt(revenue), parseInt(total_cost), parseInt(profit), parseInt(orders)]
+        );
+        console.log(`✅ تم حفظ تقرير ${todayStr}: إيرادات ${parseInt(revenue)}, تكلفة ${parseInt(total_cost)}, أرباح ${parseInt(profit)}, عدد ${parseInt(orders)}`);
+    } catch (err) {
+        console.error('❌ خطأ في المهمة المجدولة:', err.message);
+    }
 });
 
 // تقديم الواجهة الأمامية
@@ -321,6 +355,7 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// بدء الخادم
 app.listen(port, () => {
     console.log(`🚀 السيرفر يعمل على المنفذ ${port}`);
 });
