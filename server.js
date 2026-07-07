@@ -254,16 +254,34 @@ app.delete('/api/sales/:id', async (req, res) => {
     }
 });
 
-// جلب المبيعات حسب التاريخ
+// جلب المبيعات حسب التاريخ والفترة الزمنية (معدل لدعم فلترة الوقت)
 app.get('/api/sales', async (req, res) => {
-    const { date, startDate, endDate } = req.query;
+    const { date, startDate, endDate, startTime, endTime } = req.query;
     let query = 'SELECT * FROM sales';
     const params = [];
     const conditions = [];
-    if (date) { conditions.push(`sale_date = $${params.length + 1}`); params.push(date); }
-    if (startDate && endDate) { conditions.push(`sale_date BETWEEN $${params.length + 1} AND $${params.length + 2}`); params.push(startDate, endDate); }
-    if (conditions.length > 0) query += ' WHERE ' + conditions.join(' AND ');
+
+    // تصفية حسب التاريخ
+    if (date) {
+        conditions.push(`sale_date = $${params.length + 1}`);
+        params.push(date);
+    }
+    if (startDate && endDate) {
+        conditions.push(`sale_date BETWEEN $${params.length + 1} AND $${params.length + 2}`);
+        params.push(startDate, endDate);
+    }
+
+    // تصفية حسب الوقت (للتقارير اليومية مع فترة زمنية محددة)
+    if (date && startTime && endTime) {
+        conditions.push(`sale_time BETWEEN $${params.length + 1} AND $${params.length + 2}`);
+        params.push(startTime, endTime);
+    }
+
+    if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
+    }
     query += ' ORDER BY timestamp DESC';
+
     try {
         const result = await pool.query(query, params);
         res.json(result.rows);
