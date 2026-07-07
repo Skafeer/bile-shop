@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <style>
-        /* --- جميع الأنماط (نفس السابق) --- */
+        /* --- جميع الأنماط (نفس السابق مع إضافات للوقت) --- */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Tajawal', sans-serif; background: linear-gradient(135deg, #FFF5DF 0%, #F5E6D3 100%); min-height: 100vh; direction: rtl; }
         .header { background: linear-gradient(135deg, #121B38 0%, #1a2854 100%); color: white; padding: 20px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
@@ -70,6 +70,10 @@
         .reports-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
         .report-card { background: #f8f9fa; padding: 20px; border-radius: 12px; border: 2px solid #e9ecef; }
         .date-filter { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+        .time-filter { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; }
+        .time-filter input[type="time"] { padding: 8px 12px; border: 2px solid #e9ecef; border-radius: 8px; font-family: 'Tajawal', sans-serif; font-size: 0.95rem; }
+        .time-filter input[type="time"]:focus { outline: none; border-color: #C5632C; box-shadow: 0 0 0 3px rgba(197, 99, 44, 0.1); }
+        .time-filter label { font-weight: 500; color: #121B38; }
         .empty-state { text-align: center; padding: 40px; color: #6c757d; }
         .empty-state i { font-size: 3rem; margin-bottom: 15px; opacity: 0.5; }
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 2000; justify-content: center; align-items: center; animation: fadeIn 0.3s ease; }
@@ -80,7 +84,7 @@
         .modal-box .form-actions { display: flex; gap: 10px; margin-top: 20px; }
         .modal-box .form-actions .btn { flex: 1; }
         .modal-box .btn-close-modal { background: #6c757d; }
-        @media (max-width: 768px) { .tabs { flex-direction: column; } .header h1 { font-size: 2rem; } .container { padding: 10px; } .products-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } .summary-grid { grid-template-columns: 1fr 1fr; } .date-filter { flex-direction: column; align-items: stretch; } .product-item { flex-wrap: wrap; gap: 10px; } }
+        @media (max-width: 768px) { .tabs { flex-direction: column; } .header h1 { font-size: 2rem; } .container { padding: 10px; } .products-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } .summary-grid { grid-template-columns: 1fr 1fr; } .date-filter { flex-direction: column; align-items: stretch; } .time-filter { flex-direction: column; align-items: stretch; } .product-item { flex-wrap: wrap; gap: 10px; } }
         .notification { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 15px 25px; border-radius: 8px; color: white; font-weight: 500; z-index: 3000; animation: slideDown 0.3s ease; }
         .notification.success { background: #28a745; }
         .notification.error { background: #dc3545; }
@@ -107,23 +111,10 @@
             <div class="sales-summary">
                 <h3 style="margin-bottom: 20px; text-align: center;"><i class="fas fa-calendar-day"></i> ملخص مبيعات اليوم</h3>
                 <div class="summary-grid">
-                    <!-- الترتيب الجديد: إجمالي المبيعات، إجمالي التكلفة، صافي الربح، عدد المبيعات -->
-                    <div class="summary-item">
-                        <h3 id="todayRevenue">0</h3>
-                        <p>إجمالي المبيعات (د.ع)</p>
-                    </div>
-                    <div class="summary-item">
-                        <h3 id="todayCost">0</h3>
-                        <p>إجمالي التكلفة (د.ع)</p>
-                    </div>
-                    <div class="summary-item">
-                        <h3 id="todayProfit">0</h3>
-                        <p>صافي الربح (د.ع)</p>
-                    </div>
-                    <div class="summary-item">
-                        <h3 id="todayOrders">0</h3>
-                        <p>عدد المبيعات</p>
-                    </div>
+                    <div class="summary-item"><h3 id="todayRevenue">0</h3><p>إجمالي المبيعات (د.ع)</p></div>
+                    <div class="summary-item"><h3 id="todayCost">0</h3><p>إجمالي التكلفة (د.ع)</p></div>
+                    <div class="summary-item"><h3 id="todayProfit">0</h3><p>صافي الربح (د.ع)</p></div>
+                    <div class="summary-item"><h3 id="todayOrders">0</h3><p>عدد المبيعات</p></div>
                 </div>
             </div>
             <div class="grid">
@@ -133,9 +124,7 @@
                         <input type="text" id="searchSalesProducts" placeholder="ابحث عن منتج...">
                         <i class="fas fa-search"></i>
                     </div>
-                    <div class="products-grid" id="salesProducts">
-                        <div class="empty-state"><i class="fas fa-bicycle"></i><p>لا توجد منتجات متاحة</p></div>
-                    </div>
+                    <div class="products-grid" id="salesProducts"><div class="empty-state"><i class="fas fa-bicycle"></i><p>لا توجد منتجات متاحة</p></div></div>
                 </div>
                 <div class="card">
                     <h3 style="margin-bottom: 20px; color: #121B38;"><i class="fas fa-list"></i> سجل المبيعات اليومية</h3>
@@ -166,7 +155,7 @@
             </div>
         </div>
 
-        <!-- التقارير المالية -->
+        <!-- التقارير المالية (مع فلترة الوقت بصيغة 12 ساعة) -->
         <div class="tab-content" id="reports">
             <h2 class="section-title"><i class="fas fa-chart-bar"></i> التقارير المالية</h2>
             <div class="date-filter">
@@ -175,12 +164,33 @@
                 <button class="btn" id="generateReport"><i class="fas fa-search"></i> عرض التقرير</button>
                 <button class="btn btn-success" id="printReport"><i class="fas fa-print"></i> طباعة التقرير</button>
             </div>
+
+            <!-- فلترة الوقت بصيغة 12 ساعة -->
+            <div class="time-filter">
+                <label style="font-weight: 500;">الفترة الزمنية (اختياري):</label>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <div>
+                        <label for="startTime" style="font-size:0.9rem;">من:</label>
+                        <input type="time" id="startTime" step="1" style="direction: ltr;">
+                    </div>
+                    <div>
+                        <label for="endTime" style="font-size:0.9rem;">إلى:</label>
+                        <input type="time" id="endTime" step="1" style="direction: ltr;">
+                    </div>
+                    <button class="btn btn-sm" onclick="clearTimeFilter()" style="background:#6c757d;">
+                        <i class="fas fa-times"></i> إلغاء الفلترة
+                    </button>
+                </div>
+                <small style="color:#6c757d; margin-right:10px;">(اترك الحقول فارغة لعرض اليوم كاملاً)</small>
+            </div>
+
             <div class="reports-grid">
                 <div class="report-card">
-                    <h3 style="margin-bottom: 15px; color: #121B38;"><i class="fas fa-calculator"></i> ملخص اليوم المحدد</h3>
+                    <h3 style="margin-bottom: 15px; color: #121B38;"><i class="fas fa-calculator"></i> ملخص الفترة المحددة</h3>
                     <div id="dailyReportSummary">
                         <div class="summary-grid">
                             <div class="summary-item" style="background: #f8f9fa; color: #121B38;"><h3 id="reportRevenue">0</h3><p>إجمالي المبيعات (د.ع)</p></div>
+                            <div class="summary-item" style="background: #f8f9fa; color: #121B38;"><h3 id="reportCost">0</h3><p>إجمالي التكلفة (د.ع)</p></div>
                             <div class="summary-item" style="background: #f8f9fa; color: #121B38;"><h3 id="reportProfit">0</h3><p>صافي الربح (د.ع)</p></div>
                             <div class="summary-item" style="background: #f8f9fa; color: #121B38;"><h3 id="reportOrders">0</h3><p>عدد المبيعات</p></div>
                         </div>
@@ -188,9 +198,10 @@
                 </div>
                 <div class="report-card">
                     <h3 style="margin-bottom: 15px; color: #121B38;"><i class="fas fa-list-alt"></i> تفاصيل المبيعات</h3>
-                    <div class="sales-list" id="reportDetails" style="max-height: 300px;"><div class="empty-state"><i class="fas fa-calendar-times"></i><p>لا توجد مبيعات في هذا التاريخ</p></div></div>
+                    <div class="sales-list" id="reportDetails" style="max-height: 300px;"><div class="empty-state"><i class="fas fa-calendar-times"></i><p>لا توجد مبيعات في هذه الفترة</p></div></div>
                 </div>
             </div>
+
             <div class="report-card" style="margin-top: 20px;">
                 <h3 style="margin-bottom: 15px; color: #121B38;"><i class="fas fa-chart-line"></i> إحصائيات عامة</h3>
                 <div class="summary-grid">
@@ -224,6 +235,18 @@
     // ------------------- المتغيرات والدوال المساعدة -------------------
     let products = [];
     let sortableInstance = null;
+
+    // دالة تحويل الوقت من 24 ساعة إلى 12 ساعة مع AM/PM
+    function formatTime12(time24) {
+        if (!time24) return '';
+        const parts = time24.split(':');
+        let hours = parseInt(parts[0]);
+        const minutes = parts[1];
+        const seconds = parts[2] || '00';
+        const ampm = hours >= 12 ? 'م' : 'ص';
+        hours = hours % 12 || 12;
+        return `${hours}:${minutes}:${seconds} ${ampm}`;
+    }
 
     function formatNumber(num) {
         return new Intl.NumberFormat('ar-IQ').format(num);
@@ -459,7 +482,7 @@
                 <div class="sale-item">
                     <div class="sale-info">
                         <strong>${s.product_name}</strong><br>
-                        <small>${s.sale_time}</small>
+                        <small>${formatTime12(s.sale_time)}</small>
                         <div style="font-size:0.9rem; color: #28a745;">ربح: ${formatNumber(s.profit)} د.ع</div>
                     </div>
                     <div class="sale-actions">
@@ -471,7 +494,7 @@
         } catch (e) { console.error(e); }
     }
 
-    // ------------------- تحديث الإحصائيات (معدل) -------------------
+    // ------------------- تحديث الإحصائيات -------------------
     async function updateTodayStats() {
         try {
             const stats = await apiFetch('/api/stats/today');
@@ -492,48 +515,107 @@
         } catch (e) { console.error(e); }
     }
 
-    // ------------------- التقارير -------------------
-    function saveDailySales() { showNotification('جميع المبيعات محفوظة تلقائياً في قاعدة البيانات', 'info'); }
+    // ------------------- التقارير مع فلترة الوقت -------------------
+    function clearTimeFilter() {
+        document.getElementById('startTime').value = '';
+        document.getElementById('endTime').value = '';
+        generateReport();
+    }
 
     async function generateReport() {
         const selectedDate = document.getElementById('reportDate').value;
-        if (!selectedDate) { showNotification('يرجى اختيار تاريخ', 'error'); return; }
+        if (!selectedDate) {
+            showNotification('يرجى اختيار تاريخ', 'error');
+            return;
+        }
+
+        // قراءة وقت البداية والنهاية (بصيغة 24 ساعة من input type="time")
+        const startTime = document.getElementById('startTime').value;
+        const endTime = document.getElementById('endTime').value;
+
         try {
-            const sales = await apiFetch(`/api/sales?date=${selectedDate}`);
+            // بناء الرابط مع المعاملات
+            let url = `/api/sales?date=${selectedDate}`;
+            if (startTime) url += `&startTime=${startTime}`;
+            if (endTime) url += `&endTime=${endTime}`;
+
+            const sales = await apiFetch(url);
+            
+            // حساب الإحصائيات
             const revenue = sales.reduce((sum, s) => sum + s.sale_price, 0);
+            const totalCost = sales.reduce((sum, s) => sum + s.cost_price, 0);
             const profit = sales.reduce((sum, s) => sum + s.profit, 0);
+            const orders = sales.length;
+
+            // عرض الملخص
             document.getElementById('reportRevenue').textContent = formatNumber(revenue);
+            document.getElementById('reportCost').textContent = formatNumber(totalCost);
             document.getElementById('reportProfit').textContent = formatNumber(profit);
-            document.getElementById('reportOrders').textContent = sales.length;
+            document.getElementById('reportOrders').textContent = orders;
+
+            // عرض تفاصيل المبيعات
             const container = document.getElementById('reportDetails');
             if (sales.length === 0) {
-                container.innerHTML = `<div class="empty-state"><i class="fas fa-calendar-times"></i><p>لا توجد مبيعات</p></div>`;
+                container.innerHTML = `<div class="empty-state"><i class="fas fa-calendar-times"></i><p>لا توجد مبيعات في هذه الفترة</p></div>`;
                 return;
             }
+
+            // عرض الوقت بصيغة 12 ساعة
             container.innerHTML = sales.map(s => `
                 <div class="sale-item">
-                    <div><strong>${s.product_name}</strong><br><small>${s.sale_time}</small></div>
-                    <div style="text-align:center;"><strong>${formatNumber(s.sale_price)} د.ع</strong><br><small style="color:#28a745;">ربح: ${formatNumber(s.profit)} د.ع</small></div>
+                    <div class="sale-info">
+                        <strong>${s.product_name}</strong><br>
+                        <small>${formatTime12(s.sale_time)}</small>
+                        <div style="font-size:0.9rem; color: #28a745;">ربح: ${formatNumber(s.profit)} د.ع</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <strong>${formatNumber(s.sale_price)} د.ع</strong>
+                    </div>
                 </div>
             `).join('');
+
         } catch (e) { console.error(e); }
     }
 
+    // ------------------- طباعة التقرير -------------------
     function printReport() {
         const selectedDate = document.getElementById('reportDate').value;
         if (!selectedDate) return;
+        
         const content = document.getElementById('reportDetails').innerHTML;
         const revenue = document.getElementById('reportRevenue').textContent;
+        const cost = document.getElementById('reportCost').textContent;
         const profit = document.getElementById('reportProfit').textContent;
         const orders = document.getElementById('reportOrders').textContent;
+        
+        const startTime = document.getElementById('startTime').value;
+        const endTime = document.getElementById('endTime').value;
+        const timeRange = startTime && endTime ? 
+            ` (من ${formatTime12(startTime)} إلى ${formatTime12(endTime)})` : '';
+
         const printWindow = window.open('', '_blank');
         printWindow.document.write(`
             <html dir="rtl"><head><title>تقرير ${selectedDate}</title>
-            <style>body{font-family:Tajawal;padding:20px;} .header{text-align:center;} .item{margin:5px 0;border-bottom:1px solid #ddd;padding:5px;}</style>
+            <style>
+                body{font-family:Tajawal, Arial, sans-serif;padding:20px;direction:rtl;}
+                .header{text-align:center;margin-bottom:20px;}
+                .summary{display:flex;justify-content:space-around;margin:20px 0;flex-wrap:wrap;}
+                .summary-item{background:#f8f9fa;padding:15px;border-radius:8px;min-width:150px;text-align:center;margin:5px;}
+                .sale-item{margin:5px 0;border-bottom:1px solid #ddd;padding:8px;display:flex;justify-content:space-between;}
+            </style>
             </head><body>
-            <div class="header"><h1>ورشة أبو أحمد</h1><h2>تقرير ${selectedDate}</h2></div>
-            <p>الإيرادات: ${revenue} د.ع | الربح: ${profit} د.ع | عدد المبيعات: ${orders}</p>
+            <div class="header">
+                <h1>ورشة أبو أحمد للدراجات الهوائية</h1>
+                <h2>تقرير مبيعات - ${selectedDate}${timeRange}</h2>
+            </div>
+            <div class="summary">
+                <div class="summary-item"><strong>إجمالي المبيعات</strong><br>${revenue} د.ع</div>
+                <div class="summary-item"><strong>إجمالي التكلفة</strong><br>${cost} د.ع</div>
+                <div class="summary-item"><strong>صافي الربح</strong><br>${profit} د.ع</div>
+                <div class="summary-item"><strong>عدد المبيعات</strong><br>${orders}</div>
+            </div>
             <hr/>
+            <h3>تفاصيل المبيعات:</h3>
             ${content}
             <script>window.print();<\/script>
         `);
@@ -566,10 +648,16 @@
         setupTabs();
         document.getElementById('productForm').addEventListener('submit', (e) => { e.preventDefault(); addProduct(); });
         document.getElementById('searchProducts').addEventListener('input', displayProducts);
-        document.getElementById('saveDailySales').addEventListener('click', saveDailySales);
+        document.getElementById('saveDailySales').addEventListener('click', () => {
+            showNotification('جميع المبيعات محفوظة تلقائياً في قاعدة البيانات', 'info');
+        });
         document.getElementById('generateReport').addEventListener('click', generateReport);
         document.getElementById('printReport').addEventListener('click', printReport);
         document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+
+        // ربط أحداث الوقت لتوليد التقرير تلقائياً عند تغيير الوقت
+        document.getElementById('startTime').addEventListener('change', generateReport);
+        document.getElementById('endTime').addEventListener('change', generateReport);
 
         document.getElementById('searchSalesProducts').addEventListener('input', function() {
             displaySalesProducts(this.value);
